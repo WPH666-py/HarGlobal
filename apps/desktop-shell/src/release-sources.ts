@@ -92,7 +92,7 @@ export interface ReleaseAnswer {
  * anything at all.
  */
 export const RELEASE_SOURCES: readonly ReleaseSource[] = [
-  { id: 'gitee', kind: 'gitee', owner: 'ph-wang', repo: 'HarGlobal' },
+  { id: 'gitee', kind: 'gitee', owner: 'ph-wang_admin', repo: 'har-global' },
   { id: 'github', kind: 'github', owner: 'WPH666-py', repo: 'HarGlobal' },
 ]
 
