@@ -41,11 +41,9 @@ function labelOf(presentation: Presentation): 'present.workstation' | 'present.i
  * @returns the header control.
  */
 export function WorkstationToggle(props: WorkstationToggleProps): ReactNode {
-  const { t, present, useWorkstation, useIde, useServerMode } = props
-  const useMode = useWorkstation ?? useHiddenWorkstation
+  const { t, present, useIde, useServerMode } = props
   const useStage = useIde ?? useHiddenWorkstation
   const useServer = useServerMode ?? useHiddenWorkstation
-  const seat = useMode(state => state)
   const ide = useStage(state => state)
   const onServer = useServer(state => state)
   const [open, setOpen] = useState(false)
