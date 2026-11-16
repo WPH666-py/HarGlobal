@@ -1,0 +1,55 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "HarGlobal",
+  "version": "0.2.1-rc.39",
+  "identifier": "com.harglobal.desktop",
+  "build": {
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' http://127.0.0.1:*; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self'; script-src 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis",
+      "msi"
+    ],
+    "publisher": "水哥",
+    "copyright": "青岛理工大学2022级毕业生水哥",
+    "shortDescription": "Harness 科研理工版：数学建模、工科题解、学术文献、科学计算一条线。",
+    "icon": [
+      "icons/harglobal.ico"
+    ],
+    "resources": [
+      "resources/runtime",
+      "resources/shell",
+      "resources/sidecar",
+      "resources/science",
+      "resources/ketcher"
+    ],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": [
+          "SimpChinese",
+          "English"
+        ],
+        "installerIcon": "icons/harglobal.ico",
+        "installerHooks": "hooks.nsh"
+      },
+      "wix": {
+        "version": "0.2.1-rc.39",
+        "language": "zh-CN"
+      }
+    }
+  }
+}
