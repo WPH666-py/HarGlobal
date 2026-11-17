@@ -47,7 +47,7 @@
         "installerHooks": "hooks.nsh"
       },
       "wix": {
-        "version": "0.2.1-rc.39",
+        "version": "0.2.1.39",
         "language": "zh-CN"
       }
     }
