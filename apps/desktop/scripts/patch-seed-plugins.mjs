@@ -63,10 +63,13 @@ function sourceOf(name) {
  */
 function dropUnsupportedPromptVariables(seedRoot) {
   const NEWLINE = String.fromCharCode(10)
-  const pending = [join(seedRoot, 'node_modules')]
+  const pending = [[join(seedRoot, 'node_modules'), 0]]
+  const seen = new Set()
   const changed = []
   while (pending.length > 0) {
-    const dir = pending.pop()
+    const [dir, depth] = pending.pop()
+    if (seen.has(dir) || seen.size > 20000) continue
+    seen.add(dir)
     let entries
     try {
       entries = readdirSync(dir, { withFileTypes: true })
@@ -75,8 +78,9 @@ function dropUnsupportedPromptVariables(seedRoot) {
     }
     for (const entry of entries) {
       const path = join(dir, entry.name)
+      if (entry.isSymbolicLink()) continue
       if (entry.isDirectory()) {
-        if (entry.name !== '.pnpm') pending.push(path)
+        if (entry.name !== '.pnpm' && depth < 6) pending.push([path, depth + 1])
         continue
       }
       if (!entry.isFile() || !entry.name.endsWith('.yml')) continue
