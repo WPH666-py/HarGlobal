@@ -17,6 +17,7 @@
  */
 
 import { cpSync, createReadStream, createWriteStream, existsSync, linkSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { dirname, join, relative, resolve } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { fileURLToPath } from 'node:url'
@@ -25,6 +26,33 @@ import { create as createTar } from 'tar'
 
 /** zstd's own id for "the compression level", which Node's zlib passes straight through. */
 const ZSTD_COMPRESSION_LEVEL = zlibConstants.ZSTD_c_compressionLevel
+
+/**
+ * The zstd executable this build compresses the offline package with, when the machine has one.
+ *
+ * The Node binding compresses on one thread, and the seed is large enough that the single-threaded
+ * level-22 pass costs more than the whole rest of the build. A standalone zstd compresses the same
+ * archive at level 19 with every core, which is several times faster for a few percent more bytes.
+ * `HARGLOBAL_ZSTD_BIN` names an exact executable; otherwise the PATH is searched, then the copy
+ * this repository vendors under `tools/zstd`, and a machine with neither falls back to the Node
+ * binding at the same level.
+ * @returns the executable path, or undefined when the machine has none.
+ */
+function zstdExecutable() {
+  const explicit = process.env.HARGLOBAL_ZSTD_BIN
+  if (explicit !== undefined && explicit !== '') return existsSync(explicit) ? explicit : undefined
+  const separator = process.platform === 'win32' ? ';' : ':'
+  const names = process.platform === 'win32' ? ['zstd.exe', 'zstd.cmd'] : ['zstd']
+  for (const entry of (process.env.PATH ?? '').split(separator)) {
+    if (entry === '') continue
+    for (const name of names) {
+      const candidate = join(entry, name)
+      if (existsSync(candidate)) return candidate
+    }
+  }
+  const vendored = join(REPO_ROOT, 'tools', 'zstd', 'zstd.exe')
+  return process.platform === 'win32' && existsSync(vendored) ? vendored : undefined
+}
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const REPO_ROOT = resolve(PACKAGE_ROOT, '..', '..')
@@ -143,12 +171,13 @@ if (withSeed) {
 // wall-clock and zstd is roughly a fifth smaller on this content at a level it still compresses at
 // build speed; the app accepts either extension, so older releases stay fetchable.
 //
-// Level 22 is the default because of Gitee: a release is published to both hosts from the same
-// files, Gitee caps an attachment at 100 MB, and a seed carrying the mobile and WeChat plugins is
-// already past that at level 19 (measured on rc.24: 124.1 MiB at 19, 97.0 MiB at 22). The extra
-// minutes are build-machine time, and the assertion below refuses a package nobody could download.
+// Level 19 is the default. Level 22 held a seed under Gitee's 100 MB attachment cap on rc.24
+// (124.1 MiB at 19 against 97.0 MiB at 22), and that cap no longer binds: today's seed is far past
+// it at either level, so every release splits the archive into parts regardless (see below). The
+// remaining seconds of the level-22 pass bought nothing, and the standalone zstd offsets even the
+// level-19 size by compressing with every core.
 mkdirSync(ARTIFACT_ROOT, { recursive: true })
-const level = Number(process.env.HARGLOBAL_ZSTD_LEVEL ?? '22')
+const level = Number(process.env.HARGLOBAL_ZSTD_LEVEL ?? '19')
 const tarPath = join(ARTIFACT_ROOT, `${PRODUCT_NAME}-seed-${version}.tar`)
 const archive = join(ARTIFACT_ROOT, `${PRODUCT_NAME}-seed-${version}.tar.zst`)
 rmSync(tarPath, { force: true })
@@ -162,15 +191,28 @@ createTar({
   portable: true,
   sync: true,
 }, readdirSync(SEED_SOURCE))
-await pipeline(
-  createReadStream(tarPath),
-  createZstdCompress({ params: { [ZSTD_COMPRESSION_LEVEL]: level } }),
-  createWriteStream(archive),
-)
+const zstd = zstdExecutable()
+if (zstd !== undefined) {
+  // -T0 threads the pass across every core; the standalone CLI offers it, the Node binding does not.
+  const result = spawnSync(zstd, [`-${String(level)}`, '-T0', '--no-progress', '-q', '-f', '-o', archive, tarPath], {
+    stdio: 'inherit',
+  })
+  if (result.error !== undefined) throw result.error
+  if (result.status !== 0) {
+    throw new Error(`prepare-shell: zstd exited with ${String(result.status)} while writing ${archive}`)
+  }
+} else {
+  await pipeline(
+    createReadStream(tarPath),
+    createZstdCompress({ params: { [ZSTD_COMPRESSION_LEVEL]: level } }),
+    createWriteStream(archive),
+  )
+}
 rmSync(tarPath, { force: true })
 const archiveBytes = statSync(archive).size
 const megabytes = (archiveBytes / 1024 / 1024).toFixed(1)
-process.stdout.write(`prepare-shell: offline package ${archive} (${megabytes} MB, zstd -${String(level)})\n`)
+const via = zstd === undefined ? 'node' : 'cli -T0'
+process.stdout.write(`prepare-shell: offline package ${archive} (${megabytes} MB, zstd -${String(level)}, ${via})\n`)
 
 // Gitee refuses an attachment over 100 MB, so an offline package past that cap is published in
 // fixed-size parts (`scripts/release/split-offline-package.mjs`) while GitHub keeps the whole
