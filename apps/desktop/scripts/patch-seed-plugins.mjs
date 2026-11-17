@@ -52,6 +52,50 @@ function sourceOf(name) {
 }
 
 /**
+ * Remove the `{{cwd}}` suffix line from every preset the seed installs.
+ *
+ * The engine registers only `provider` and `model` as prompt variables, and a preset that names an
+ * unknown one fails assembly for every turn taken under it. Third-party presets assume a host that
+ * exposes the working directory; the suffix is dropped here instead of widening the engine's
+ * variable set, which a test pins shut.
+ * @param seedRoot - the seed directory produced by the payload pipeline.
+ * @returns the number of preset files changed.
+ */
+function dropUnsupportedPromptVariables(seedRoot) {
+  const NEWLINE = String.fromCharCode(10)
+  const pending = [join(seedRoot, 'node_modules')]
+  const changed = []
+  while (pending.length > 0) {
+    const dir = pending.pop()
+    let entries
+    try {
+      entries = readdirSync(dir, { withFileTypes: true })
+    } catch {
+      continue
+    }
+    for (const entry of entries) {
+      const path = join(dir, entry.name)
+      if (entry.isDirectory()) {
+        if (entry.name !== '.pnpm') pending.push(path)
+        continue
+      }
+      if (!entry.isFile() || !entry.name.endsWith('.yml')) continue
+      let preset
+      try {
+        preset = readFileSync(path, 'utf8')
+      } catch {
+        continue
+      }
+      if (!preset.includes('{{cwd}}')) continue
+      const kept = preset.split(NEWLINE).filter((line) => !line.includes('{{cwd}}')).join(NEWLINE)
+      writeFileSync(path, kept + NEWLINE, 'utf8')
+      changed.push(path)
+    }
+  }
+  return changed.length
+}
+
+/**
  * Apply the plugin decisions to one seed directory.
  * @param seedRoot - the seed directory produced by the payload pipeline.
  * @returns what changed, for the build log.
@@ -93,6 +137,11 @@ export function patchSeedPlugins(seedRoot) {
     }
     dependencies[plugin.name] = plugin.spec
   }
+  // Third-party presets may name `{{cwd}}` in a persona suffix. This engine deliberately keeps the
+  // session directory out of prompt variables, so a preset that names it fails every turn it is
+  // used for; the variable is dropped from the preset rather than taught to the engine.
+  const presetsRewritten = dropUnsupportedPromptVariables(seedRoot)
+
   manifest.dependencies = dependencies
 
   // The loader reads `dsh.profile.bundles`, so a package that is only a dependency is inert.
@@ -104,7 +153,7 @@ export function patchSeedPlugins(seedRoot) {
   manifest.dsh.profile.bundles = filtered
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
 
-  return { removed, added }
+  return { removed, added, presetsRewritten }
 }
 
 /**
