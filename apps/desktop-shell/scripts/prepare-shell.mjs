@@ -155,6 +155,11 @@ rmSync(join(RESOURCE_ROOT, 'shell'), { recursive: true, force: true })
 cpSync(join(PACKAGE_ROOT, 'rsc'), join(RESOURCE_ROOT, 'shell'), { recursive: true })
 process.stdout.write(`prepare-shell: copied the shell pages into ${join(RESOURCE_ROOT, 'shell')}\n`)
 
+// Repair tools ship beside the app so a broken profile is fixable without the repository.
+rmSync(join(RESOURCE_ROOT, 'tools'), { recursive: true, force: true })
+cpSync(join(PACKAGE_ROOT, 'tools'), join(RESOURCE_ROOT, 'tools'), { recursive: true })
+process.stdout.write(`prepare-shell: copied the tools into ${join(RESOURCE_ROOT, 'tools')}` + String.fromCharCode(10))
+
 const version = applicationVersion()
 const withSeed = process.env.HARGLOBAL_SEED_IN_INSTALLER === '1'
 rmSync(SEED_STAGED, { recursive: true, force: true })
