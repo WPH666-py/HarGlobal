@@ -178,7 +178,8 @@ const ALL_PLUGINS: readonly BundledPlugin[] = [
     // baseline does not declare, so its settings pane stays absent — `slots.inject` waits for a
     // declaration rather than failing, so the panel itself is unaffected.
     name: '@xbzbing/dsh-git-panel',
-    version: '1.4.0',
+    version: '1.4.1',
+    spec: 'file:plugins/xbzbing-dsh-git-panel-1.4.1.tgz',
     active: true,
   },
   {
@@ -342,7 +343,7 @@ const ALL_PLUGINS: readonly BundledPlugin[] = [
   { name: 'dsh-web-search-pro', version: '0.2.3', active: true },
   { name: '@liustack/modsearch', version: '5.10.11', active: true },
   { name: 'dsh-blender', version: '0.2.4', active: true },
-  { name: '@linxin666/dsh-pet', version: '0.4.12', active: true },
+  { name: '@linxin666/dsh-pet', version: '0.4.13', spec: 'file:plugins/linxin666-dsh-pet-0.4.13.tgz', active: true },
   { name: 'dsh-scholar-suite', version: '0.1.0', spec: 'file:plugins/dsh-scholar-suite-0.1.0.tgz', active: false }, // peer range excludes this baseline
   { name: '@openmaic/dsh-openmaic', version: '0.4.0', spec: 'file:plugins/openmaic-dsh-openmaic-0.4.0.tgz', active: true },
   { name: '@xiaoyuink/dsh-image-vision', version: '2.9.2', spec: 'file:plugins/xiaoyuink-dsh-image-vision-2.9.2.tgz', active: false }, // peer range excludes this baseline
@@ -354,8 +355,18 @@ const ALL_PLUGINS: readonly BundledPlugin[] = [
   { name: 'dsh-meme', version: '0.1.56', spec: 'file:plugins/dsh-meme-0.1.56.tgz', active: true },
   // Bundled and enabled: the per-model prompt switcher this product ships with. No registry
   // carries a usable version, so it travels as a local archive beside the other ones.
-  { name: 'dsh-purge', version: '1.1.71', spec: 'file:plugins/dsh-purge-1.1.71.tgz', active: true },
+  { name: 'dsh-purge', version: '1.1.72', spec: 'file:plugins/dsh-purge-1.1.72.tgz', active: true },
+  // Agent-Mix: twelve coding-agent workflows as selectable presets, built in rather than installed
+  // so a fresh profile opens with the mode list the product documents. The package is
+  // repository-only, so the release carries its archive and the seed resolves a `file:` spec.
+  //
+  // It declares no runtime dependencies: every `@deepseek-ai/*` row its patch mounts already
+  // belongs to this baseline, which is why a 50 KB archive is the whole plugin. `active: true`
+  // loads the bundle patch, whose `agent-mix` row and twelve `@deepseek-ai/dsh-agent-preset` rows
+  // are what put the modes in the picker.
+  { name: 'agent-mix', version: '0.1.0', spec: 'file:plugins/agent-mix-0.1.0.tgz', active: true },
 ]
+
 
 /**
  * Plugins this product installs into a fresh Desktop profile, in declaration order.
