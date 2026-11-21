@@ -122,8 +122,17 @@ function signingWindows() {
  */
 function configArgs() {
   const windows = signingWindows();
-  if (!windows) return [];
-  return ['--config', JSON.stringify({ bundle: { windows } })];
+  const bundle = windows ? { windows } : {};
+  // The offline package is optional: the base manifest never names it, so a thin installer
+  // builds from a checkout where no seed was staged, and a seed build adds the directory back.
+  if (process.env.HARGLOBAL_SEED_IN_INSTALLER === '1') {
+    const manifest = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'src-tauri', 'tauri.conf.json'), 'utf8'));
+    const resources = [...(manifest.bundle?.resources ?? [])];
+    if (!resources.includes('resources/seed')) resources.push('resources/seed');
+    bundle.resources = resources;
+  }
+  if (Object.keys(bundle).length === 0) return [];
+  return ['--config', JSON.stringify({ bundle })];
 }
 
 function tauriEntry() {
