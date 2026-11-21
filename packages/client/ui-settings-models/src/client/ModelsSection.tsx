@@ -30,6 +30,7 @@ import type { LlmNativeAuth, SettingsNamespaceView } from '@deepseek-ai/dsh-api-
 import type {} from './slot-contract.ts'
 import { CustomProviderCard } from './CustomProviderCard.tsx'
 import { deriveKeyRef, protocolChoices, providerUsable, reasoningLevelChoices } from './store.ts'
+import { CursorAccessCard } from './CursorAccessCard.tsx'
 import type { ModelsSettingsStore, ProviderRow } from './store.ts'
 import type { ModelsOperations } from './operations.ts'
 import type { SettingsSchemaOperations } from './schema-operations.ts'
@@ -752,6 +753,8 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
       >
         {deleteFailure === undefined ? null : <p className={styles['error']}>{deleteFailure}</p>}
       </Modal>
+      {/* The bundled Cursor plugin reports what its CLI still needs; no route renders nothing. */}
+      <CursorAccessCard t={t} />
     </div>
   )
 }

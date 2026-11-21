@@ -185,6 +185,19 @@ function patchInstalledWorkBuddyModelNull(root: string): Promise<void> {
   })
 }
 
+function patchInstalledWorkBuddyProviders(root: string): Promise<void> {
+  // The Models section lists the providers a plugin declares through
+  // `llm.registerConfigurableProviders`; WorkBuddy registers an adapter but never that entry, so its
+  // models work while the Models page shows no WorkBuddy card. See scripts/patch-workbuddy-providers.mjs.
+  return new Promise((resolvePromise, reject) => {
+    const child = spawn(NODE, [join(APP_ROOT, 'scripts', 'patch-workbuddy-providers.mjs'), root], { stdio: 'inherit' })
+    child.once('error', reject)
+    child.once('close', (code, signal) => {
+      if (code === 0) resolvePromise()
+      else reject(new Error(`desktop seed: workbuddy provider patch exited with ${String(code ?? signal)}`))
+    })
+  })
+}
 function patchInstalledWorkBuddyUpdateNotice(root: string): Promise<void> {
   // The WorkBuddy client checks its own releases inside its mount effect, so every launch paints a
   // 「发现新版本」 card over the workspace. Patching the installed bytes here moves that check behind
@@ -677,6 +690,7 @@ async function main(): Promise<void> {
     await patchInstalledWeChatIdentity(installedModules)
     await patchInstalledWorkBuddyModelNull(installedModules)
     await patchInstalledWorkBuddyUpdateNotice(installedModules)
+    await patchInstalledWorkBuddyProviders(installedModules)
     // Regenerates `client.js` from the patched explorer source, so it runs before the empty-state
     // patch: that one edits the source and the generated bundle by text, and would be overwritten
     // by a later regeneration.
