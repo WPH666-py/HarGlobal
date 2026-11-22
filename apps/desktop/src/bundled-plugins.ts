@@ -357,7 +357,7 @@ const ALL_PLUGINS: readonly BundledPlugin[] = [
   // carries a usable version, so it travels as a local archive beside the other ones.
   // Cursor model catalogue and delegate route: bundled so a fresh profile lists the Cursor
   // models without a separate install. It reads the local Cursor login at runtime.
-  { name: 'dsh-cursor', version: '0.6.3', spec: 'file:plugins/dsh-cursor-0.6.3.tgz', active: true },
+  { name: 'dsh-cursor', version: '0.6.4', spec: 'file:plugins/dsh-cursor-0.6.4.tgz', active: true },
   { name: 'dsh-purge', version: '1.1.72', spec: 'file:plugins/dsh-purge-1.1.72.tgz', active: true },
   // Agent-Mix: twelve coding-agent workflows as selectable presets, built in rather than installed
   // so a fresh profile opens with the mode list the product documents. The package is

@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "HarGlobal",
-  "version": "0.2.1-rc.43",
+  "version": "0.2.1-rc.44",
   "identifier": "com.harglobal.desktop",
   "build": {
     "frontendDist": "../dist"

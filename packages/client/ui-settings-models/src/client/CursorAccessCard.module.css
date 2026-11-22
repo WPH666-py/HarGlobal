@@ -81,3 +81,20 @@
   font-family: var(--dsw-font-mono, monospace);
   font-size: 11px;
 }
+
+/* The egress row: one line above the CLI steps. */
+.egress {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.badgeDenied {
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 11px;
+  line-height: 18px;
+  background: var(--dsw-alias-state-danger-primary, #c0392b);
+  color: #ffffff;
+}

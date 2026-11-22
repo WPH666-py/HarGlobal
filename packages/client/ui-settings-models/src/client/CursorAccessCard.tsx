@@ -16,6 +16,19 @@ interface CursorStatus {
   readonly distro: string
   readonly binary: string
   readonly steps: readonly CursorStep[]
+  /** Which address the CLI reaches Cursor from; absent on an older Host. */
+  readonly egress?: CursorEgress
+}
+
+/** One egress observation from the Host. */
+interface CursorEgress {
+  readonly ok: boolean
+  readonly ip?: string
+  readonly country?: string
+  readonly org?: string
+  readonly denied?: boolean
+  readonly ms?: number
+  readonly reason?: string
 }
 
 /** Route the bundled plugin registers; a profile without the plugin answers 404. */
@@ -32,15 +45,15 @@ async function loadStatus(signal: AbortSignal): Promise<CursorStatus | null> {
   }
 }
 
+/** Copy this card reads from the models dictionary. */
+type CopyKey = (key: 'cursor.title' | 'cursor.ready' | 'cursor.notReady' | 'cursor.copy' | 'cursor.copied' | 'cursor.egress' | 'cursor.egressUnknown' | 'cursor.egressDenied') => string
+
 /**
  * Draw the Cursor readiness of this machine, with the fix command for each unmet step.
- *
- * The card draws nothing when no Cursor plugin serves the route, so a profile that never installed
- * the plugin keeps the General page exactly as it was.
  * @param props - localized copy.
  * @returns the card, or null when the status route is absent.
  */
-export function CursorAccessCard({ t }: { t: (key: 'cursor.title' | 'cursor.ready' | 'cursor.notReady' | 'cursor.copy' | 'cursor.copied') => string }) {
+export function CursorAccessCard({ t }: { t: CopyKey }) {
   const [status, setStatus] = useState<CursorStatus | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
@@ -68,6 +81,7 @@ export function CursorAccessCard({ t }: { t: (key: 'cursor.title' | 'cursor.read
           {status.ok ? t('cursor.ready') : t('cursor.notReady')}
         </span>
       </div>
+      <EgressRow egress={status.egress} t={t} />
       <ul className={css.steps}>
         {status.steps.map(step => (
           <li key={step.id} className={css.step} data-cursor-step={step.id} data-cursor-step-ok={step.ok ? '1' : '0'}>
@@ -86,6 +100,32 @@ export function CursorAccessCard({ t }: { t: (key: 'cursor.title' | 'cursor.read
           </li>
         ))}
       </ul>
+    </div>
+  )
+}
+
+/**
+ * The egress row: the address Cursor sees, or why it could not be read.
+ *
+ * A failed probe is not an error: a machine with the proxy closed still answers every turn, so the
+ * row reports the missing observation without colouring the card as broken.
+ * @param props - the Host observation and localized copy.
+ * @returns the row.
+ */
+function EgressRow({ egress, t }: { egress?: CursorEgress | undefined; t: CopyKey }) {
+  if (egress === undefined) return null
+  const tone = egress.ok === false ? css.badgeWarn : egress.denied === true ? css.badgeDenied : css.badgeOk
+  const detail = egress.ok === false
+    ? t('cursor.egressUnknown')
+    : [egress.country, egress.ip, egress.ms === undefined ? undefined : `${String(egress.ms)} ms`]
+      .filter(part => part !== undefined && part !== '')
+      .join(' · ')
+  const label = egress.ok !== false && egress.denied === true ? t('cursor.egressDenied') : undefined
+  return (
+    <div className={css.egress} data-cursor-egress={egress.ok === false ? 'unknown' : egress.denied === true ? 'denied' : 'allowed'}>
+      <span className={css.name}>{t('cursor.egress')}</span>
+      <span className={tone}>{label ?? detail}</span>
+      {label === undefined ? null : <span className={css.detail}>{detail}</span>}
     </div>
   )
 }
