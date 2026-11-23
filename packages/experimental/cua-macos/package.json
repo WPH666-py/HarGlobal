@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-experimental-cua-macos",
   "description": "macOS native provider for shared Computer Use application and window objects",
-  "version": "0.2.1-rc.46",
+  "version": "0.2.1-rc.47",
   "publishConfig": {
     "access": "public"
   },
