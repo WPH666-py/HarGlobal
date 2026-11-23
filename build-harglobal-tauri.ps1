@@ -185,9 +185,6 @@ function Repair-Msi([string]$Version) {
 $env:DSH_DESKTOP_APP_ID = 'com.harglobal.desktop'
 $ProductName = 'HarGlobal'
 $env:DSH_DESKTOP_UNSIGNED = '1'
-# The extracted seed rides in the installer so setup can boot the host once. That boot is the
-# first compilation of the plugin tree; it finishes before the user opens the splash.
-$env:HARGLOBAL_SEED_IN_INSTALLER = '1'
 
 # --- Build environment the pipeline cannot infer -----------------------------
 #

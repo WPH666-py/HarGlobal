@@ -24,7 +24,8 @@ import { Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { createGunzip, createZstdDecompress } from 'node:zlib'
 import { extract } from 'tar'
-import { findPublishedAsset, findPublishedAssets, type ReleaseAsset } from './release-sources.ts'
+import { readReleaseAnswers, type ReleaseAsset, type ReleaseFacts } from './release-sources.ts'
+import { isNewer } from './version.ts'
 import { PRODUCT_NAME } from '../../desktop/src/product.ts'
 import { downloadVerified } from './release-channel.ts'
 
@@ -110,23 +111,52 @@ function seedPartIndex(version: string, name: string): number | undefined {
  * @param version - release version the parts belong to.
  * @returns the ordered parts, or undefined when the release publishes none.
  */
-async function findPublishedSeedParts(
+/** Newest release first. Equal tags keep the order the host listed them in. */
+function newestReleaseFirst(releases: readonly ReleaseFacts[]): ReleaseFacts[] {
+  return releases.slice().sort((left, right) => {
+    if (isNewer(left.tag, right.tag)) return -1
+    if (isNewer(right.tag, left.tag)) return 1
+    return 0
+  })
+}
+
+/**
+ * One host's copy of this version's archive, whole file or parts.
+ *
+ * Sources are asked in {@link readReleaseAnswers} order, Gitee then GitHub. A later host is
+ * used only when an earlier one has neither the whole archive nor a complete part set, so a
+ * machine in China is not sent to GitHub while Gitee already has the file.
+ */
+/** A whole archive, or the numbered parts of one, from a single host. */
+type PublishedSeed =
+  | { readonly tag: string; readonly asset: ReleaseAsset }
+  | { readonly tag: string; readonly parts: readonly SeedPart[] }
+
+async function findPublishedSeed(
   request: typeof globalThis.fetch,
   version: string,
-): Promise<readonly SeedPart[] | undefined> {
-  const published = await findPublishedAssets(request, candidate => seedPartIndex(version, candidate) !== undefined)
-  if (published === undefined) return undefined
-  const parts = published.assets
-    .map((asset): SeedPart => ({ asset, index: seedPartIndex(version, asset.name) ?? 0 }))
-    .sort((left, right) => left.index - right.index)
-  for (const [position, part] of parts.entries()) {
-    if (part.index !== position + 1) {
-      throw new Error(
-        `离线包分卷不连续：${published.tag} 缺少 .part${String(position + 1)}`,
-      )
+  names: readonly string[],
+): Promise<PublishedSeed | undefined> {
+  const answers = await readReleaseAnswers(request)
+  for (const answer of answers) {
+    if (answer.releases === undefined) continue
+    for (const facts of newestReleaseFirst(answer.releases)) {
+      const asset = facts.assets.find(candidate => candidate.url !== '' && names.includes(candidate.name))
+      if (asset !== undefined) return { tag: facts.tag, asset }
+      const parts = facts.assets
+        .filter(candidate => candidate.url !== '' && seedPartIndex(version, candidate.name) !== undefined)
+        .map((candidate): SeedPart => ({ asset: candidate, index: seedPartIndex(version, candidate.name) ?? 0 }))
+        .sort((left, right) => left.index - right.index)
+      if (parts.length === 0) continue
+      for (const [position, part] of parts.entries()) {
+        if (part.index !== position + 1) {
+          throw new Error(`离线包分卷不连续：${facts.tag} 缺少 .part${String(position + 1)}`)
+        }
+      }
+      return { tag: facts.tag, parts }
     }
   }
-  return parts
+  return undefined
 }
 
 /**
@@ -624,24 +654,21 @@ export async function ensureSeedPackage(options: SeedPackageOptions): Promise<Se
   const origin = manual === undefined ? 'download' : 'manual'
   if (archive === undefined) {
     options.onProgress?.('正在查找离线包…', undefined, '查找离线包')
-    const published = await findPublishedAsset(request, candidate => names.includes(candidate))
+    const published = await findPublishedSeed(request, options.version, names)
     if (published === undefined) {
-      // A release may publish the same archive as numbered parts so that each file fits the smaller
-      // attachment limit of the second host. The parts are that archive cut at byte boundaries, so
-      // fetching them together is the same transaction over more connections; nothing about the
-      // result is weaker, because the joined file still has to be a valid archive.
-      const parts = await findPublishedSeedParts(request, options.version)
-      if (parts === undefined) {
-        throw new Error(
-          `找不到离线包 ${names[0] ?? ''}（或其分卷 ${SEED_ARCHIVE_PREFIX}${options.version}${String(SEED_ARCHIVE_EXTENSIONS[0])}.part1…）。\n\n`
-          + '请确认网络可用后重试；也可以手动从发布页下载该文件（分卷需全部下载后按序号拼接），'
-          + `放进 ${join(options.cacheRoot, SEED_DOWNLOADS_DIRECTORY)} 后重新启动。`,
-        )
-      }
+      throw new Error(
+        `找不到离线包 ${names[0] ?? ''}（或其分卷 ${SEED_ARCHIVE_PREFIX}${options.version}${String(SEED_ARCHIVE_EXTENSIONS[0])}.part1…）。\n\n`
+        + '请确认网络可用后重试；也可以手动从发布页下载该文件（分卷需全部下载后按序号拼接），'
+        + `放进 ${join(options.cacheRoot, SEED_DOWNLOADS_DIRECTORY)} 后重新启动。`,
+      )
+    }
+    if ('parts' in published) {
+      // Gitee caps one attachment, so the same archive is published there as numbered parts.
+      // They are a byte cut of the whole file; the joined result is checked the same way.
       archive = await downloadSeedParts({
         cacheRoot: options.cacheRoot,
         fetch: request,
-        parts,
+        parts: published.parts,
         version: options.version,
         onProgress: options.onProgress,
       })
