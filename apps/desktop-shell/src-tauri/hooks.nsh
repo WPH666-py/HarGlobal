@@ -14,11 +14,20 @@
   RMDir /r "$INSTDIR\resources"
 !macroend
 
-; Building the runtime during setup was removed. It ran the sidecar with `--prebuild`, which on a
-; machine without network fetched the seed before setup could finish: the step was bounded only by
-; a twenty-minute timeout, so an installer that looked hung was one waiting on a download nobody
-; asked for. Setup now lays files down and returns; the first launch performs the same transaction
-; in front of the progress window that exists to show it, and the fetch happens once behind that
-; window instead of inside the installer's own silence.
+; Building the runtime during setup is what keeps the first launch at the speed of a warm one: the
+; seed is already on disk, so the materialisation happens here instead of behind the launch splash.
+; Two guards keep that from becoming the failure it used to be:
+;
+;  * it runs only when this installer shipped a seed. A thin installer has none, and the first
+;    launch is the side that may fetch one — silently downloading inside setup is exactly what made
+;    an earlier release look hung, because setup has no progress for it.
+;  * it cannot run forever. The process stops itself after ten minutes (the shell's own watchdog),
+;    and a non-zero result is reported here and then ignored: the first launch performs the same
+;    transaction in front of its own progress window.
 !macro NSIS_HOOK_POSTINSTALL
+  IfFileExists "$INSTDIR\resources\seed\desktop-release.json" 0 harGlobalNoBundledSeed
+    DetailPrint "Preparing the offline runtime (one time, a few minutes)..."
+    ExecWait '"$INSTDIR\resources\runtime\node\node.exe" "$INSTDIR\resources\sidecar\shell.mjs" --prebuild --resource-dir "$INSTDIR\resources" --log-dir "$LOCALAPPDATA\com.harglobal.desktop\logs" --install-dir "$INSTDIR"' $0
+    DetailPrint "Offline runtime preparation finished with $0; the first launch finishes it if needed."
+  harGlobalNoBundledSeed:
 !macroend

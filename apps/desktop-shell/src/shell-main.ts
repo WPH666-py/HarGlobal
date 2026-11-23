@@ -87,6 +87,16 @@ const NSIS_SILENT_SWITCH = '/S'
  */
 const PREBUILD_SWITCH = '--prebuild'
 
+/**
+ * How long the installer's prebuild may run before it gives up.
+ *
+ * Setup waits on this process, so a machine where the materialisation stalls would otherwise sit
+ * in a silent installer. Ten minutes covers a cold disk several times over; a run that exceeds it
+ * exits non-zero and the first launch performs the same transaction in front of its progress
+ * window, which is what the installer fallback already means.
+ */
+const PREBUILD_TIMEOUT_MS = 10 * 60 * 1000
+
 /** Directory Node keeps its on-disk V8 compile cache in for the backend process. */
 const COMPILE_CACHE_DIRECTORY = 'node-compile-cache'
 
@@ -341,6 +351,32 @@ async function warmRuntime(
  * ignores the exit code so a failure falls back to the first launch's own build.
  * @param argv - this process's arguments, including the prebuild switch.
  */
+/**
+ * Fill in `--version` from the seed the installer just laid down.
+ *
+ * Setup runs the prebuild without a version argument: the NSIS template is not a place to keep a
+ * second copy of it, and the seed already carries the release it was built for. A missing or
+ * unreadable seed leaves the argv untouched, so the failure names the missing argument.
+ * @param argv - installer arguments.
+ * @returns the same arguments with a version when the seed names one.
+ */
+function withSeedVersion(argv: readonly string[]): readonly string[] {
+  if (argv.includes('--version')) return argv
+  const index = argv.indexOf('--resource-dir')
+  if (index < 0) return argv
+  const resourceDir = argv[index + 1]
+  if (resourceDir === undefined) return argv
+  try {
+    const release: unknown = JSON.parse(readFileSync(join(resourceDir, 'seed', 'desktop-release.json'), 'utf8'))
+    const version = typeof release === 'object' && release !== null && typeof (release as { version?: unknown }).version === 'string'
+      ? (release as { version: string }).version
+      : undefined
+    return version === undefined ? argv : [...argv, '--version', version]
+  } catch {
+    return argv
+  }
+}
+
 async function prebuild(argv: readonly string[]): Promise<void> {
   const options = parseArguments(argv)
   const logs = new DesktopLogBuffer(join(options.logDirectory, 'harness.log'))
@@ -797,162 +833,162 @@ async function main(): Promise<void> {
     // The offline package is obtained before anything can be installed from it. A first launch on
     // a normal installation fetches it once; every later launch finds it where it was left, and an
     // offline installer ships it beside the runtime so nothing is fetched at all.
-    const seed = await ensureSeedPackage({
-      version: options.version,
-      resourceDir: options.resourceDir,
-      cacheRoot: join(paths.root, 'seed'),
-      onProgress: (note, fraction, step) => {
+      const seed = await ensureSeedPackage({
+        version: options.version,
+        resourceDir: options.resourceDir,
+        cacheRoot: join(paths.root, 'seed'),
+        onProgress: (note, fraction, step) => {
         // The status type keeps `step` and `stepProgress` absent rather than undefined, so a
         // message that has no step to name carries no step key at all.
-        publishStatus({
-          phase: 'starting',
-          // The fetch owns the first tenth of the bar; the install that follows owns the rest.
-          progress: fraction === undefined ? status.progress : 0.05 + fraction * 0.09,
-          version: options.version,
-          note,
-          ...(step === undefined ? {} : { step }),
-          ...(fraction === undefined ? {} : { stepProgress: fraction }),
-        })
-      },
-    })
-    logShell(`offline package: ${seed.origin} at ${seed.directory}`)
-    publishStatus({ phase: 'starting', progress: 0.15, version: options.version })
-    logShell('checking the desktop runtime against the bundled release')
-    const launchVerifiedPath = join(paths.root, 'launch-verified.json')
-    const seedIntegrityPath = join(seed.directory, 'integrity.json')
-    let verifiedHit = false
-    try {
-      const integrity = statSync(seedIntegrityPath)
-      verifiedHit = verdictMatches(
-        JSON.parse(readFileSync(launchVerifiedPath, 'utf8')),
-        options.version,
-        integrity.mtimeMs,
-        integrity.size,
-        JSON.parse(readFileSync(
-          join(paths.profile, 'node_modules', '@deepseek-ai', 'dsh-desktop-host', 'package.json'),
-          'utf8',
-        )),
-      )
-    } catch (error) {
-      // An absent or unreadable record only means the launch pays for the check again.
-      logShell(`launch record: ${errorOf(error, 'launch record').message}`)
-    }
-    if (verifiedHit) logShell('launch verified on a previous launch; skipping the rebuild check')
-    const activated = verifiedHit ? false : await manager.applyRelease(seed.directory, options.version, {
-      ...hooks,
-      // A tree built from a verified seed is checked for completeness rather than booted: the boot
-      // would cost about fifty seconds of every first launch and every upgrade, and the only thing
-      // it adds over this is proof that a composition applies — which cannot have changed, because
-      // no package in this tree is new. Plugin changes still take the boot.
-      healthCheck: async (projectDir) => {
-        const report = await verifyStagedRuntime({
-          projectDir,
-          node: options.node,
-          onProgress: (fraction) => {
-            publishStatus({ ...status, step: '检查运行时完整性', stepProgress: fraction })
-          },
-        })
-        logShell(
-          `staged runtime verified: ${String(report.files)} files,`
-          + ` native modules [${report.nativeModules.join(', ')}]`,
-        )
-      },
-      beforeActivate: async () => {},
-      afterActivate: async () => {},
-    })
-    if (!verifiedHit) {
+          publishStatus({
+            phase: 'starting',
+            // The fetch owns the first tenth of the bar; the install that follows owns the rest.
+            progress: fraction === undefined ? status.progress : 0.05 + fraction * 0.09,
+            version: options.version,
+            note,
+            ...(step === undefined ? {} : { step }),
+            ...(fraction === undefined ? {} : { stepProgress: fraction }),
+          })
+        },
+      })
+      logShell(`offline package: ${seed.origin} at ${seed.directory}`)
+      publishStatus({ phase: 'starting', progress: 0.15, version: options.version })
+      logShell('checking the desktop runtime against the bundled release')
+      const launchVerifiedPath = join(paths.root, 'launch-verified.json')
+      const seedIntegrityPath = join(seed.directory, 'integrity.json')
+      let verifiedHit = false
       try {
         const integrity = statSync(seedIntegrityPath)
-        writeFileSync(launchVerifiedPath, JSON.stringify({
-          schemaVersion: 1,
-          version: options.version,
-          seedMtimeMs: integrity.mtimeMs,
-          seedSize: integrity.size,
-          recordedAt: new Date().toISOString(),
-        }))
+        verifiedHit = verdictMatches(
+          JSON.parse(readFileSync(launchVerifiedPath, 'utf8')),
+          options.version,
+          integrity.mtimeMs,
+          integrity.size,
+          JSON.parse(readFileSync(
+            join(paths.profile, 'node_modules', '@deepseek-ai', 'dsh-desktop-host', 'package.json'),
+            'utf8',
+          )),
+        )
       } catch (error) {
-        // A verdict that cannot be written only costs the next launch the check again.
+      // An absent or unreadable record only means the launch pays for the check again.
         logShell(`launch record: ${errorOf(error, 'launch record').message}`)
       }
-    }
-    logShell(activated
-      ? 'desktop runtime installed from the bundled seed'
-      : 'desktop runtime already matches the bundled release')
-    // The REA setup and the Python extras are downloads and interpreter probes that never gate the
-    // workspace: both are idempotent and resume from their own cache, and their child processes
-    // compete with the Host for the same cold files when they start first. They wait for ready.
-    const provisionAfterReady = (): void => {
-      const reaState = provisionReaBundle({
-        node: options.node,
-        profile: paths.profile,
-        plugins: paths.plugins,
-        home,
-        log: logShell,
+      if (verifiedHit) logShell('launch verified on a previous launch; skipping the rebuild check')
+      const activated = verifiedHit ? false : await manager.applyRelease(seed.directory, options.version, {
+        ...hooks,
+        // A tree built from a verified seed is checked for completeness rather than booted: the boot
+        // would cost about fifty seconds of every first launch and every upgrade, and the only thing
+        // it adds over this is proof that a composition applies — which cannot have changed, because
+        // no package in this tree is new. Plugin changes still take the boot.
+        healthCheck: async (projectDir) => {
+          const report = await verifyStagedRuntime({
+            projectDir,
+            node: options.node,
+            onProgress: (fraction) => {
+              publishStatus({ ...status, step: '检查运行时完整性', stepProgress: fraction })
+            },
+          })
+          logShell(
+            `staged runtime verified: ${String(report.files)} files,`
+          + ` native modules [${report.nativeModules.join(', ')}]`,
+          )
+        },
+        beforeActivate: async () => {},
+        afterActivate: async () => {},
       })
-      logShell(`REA bundle: ${reaState}`)
-      // The science panels import `chemcore` and `rdkit` from the provisioned interpreter.
-      provisionPythonExtras({
-        home,
-        wheelhouse: join(options.resourceDir, 'science', 'wheelhouse'),
-        log: logShell,
-      })
-    }
-    // Python, MinGW, and R are hundreds of megabytes each: starting them here keeps the download
-    // behind the workspace instead of in front of it, and the launch only records the decision.
-    for (const state of provisionRuntimes({ home, log: logShell })) logShell(`runtimes: ${state}`)
-    // Plugins spawn `python` / `python3` / `g++` by bare name, so the provisioned trees have to be
-    // on PATH before the Host spawns. A first launch has nothing on disk yet, hence the poll.
-    const adopt = (): number => {
-      const added = adoptRuntimePath(home)
-      if (added.length > 0) logShell(`runtimes: PATH += ${added.join('; ')}`)
-      return added.length
-    }
-    if (adopt() === 0) {
-      const timer = setInterval(() => {
-        if (adopt() > 0) clearInterval(timer)
-      }, 20_000)
-      setTimeout(() => clearInterval(timer), 30 * 60_000).unref()
-    }
-    // Starting the Host is the one step with no denominator: dsh reports that it is ready, and
-    // nothing in between counts anything, so this shows how long it has been running instead of a
-    // percentage that would have to be invented. Silence is what a stuck launch looks like.
-    publishStatus({
-      phase: 'starting',
-      progress: 0.95,
-      version: options.version,
-      step: '启动工作区',
-      note: '正在启动工作区…',
-    })
-    const hostStartedAt = Date.now()
-    const hostTicker = setInterval(() => {
+      if (!verifiedHit) {
+        try {
+          const integrity = statSync(seedIntegrityPath)
+          writeFileSync(launchVerifiedPath, JSON.stringify({
+            schemaVersion: 1,
+            version: options.version,
+            seedMtimeMs: integrity.mtimeMs,
+            seedSize: integrity.size,
+            recordedAt: new Date().toISOString(),
+          }))
+        } catch (error) {
+        // A verdict that cannot be written only costs the next launch the check again.
+          logShell(`launch record: ${errorOf(error, 'launch record').message}`)
+        }
+      }
+      logShell(activated
+        ? 'desktop runtime installed from the bundled seed'
+        : 'desktop runtime already matches the bundled release')
+      // The REA setup and the Python extras are downloads and interpreter probes that never gate the
+      // workspace: both are idempotent and resume from their own cache, and their child processes
+      // compete with the Host for the same cold files when they start first. They wait for ready.
+      const provisionAfterReady = (): void => {
+        const reaState = provisionReaBundle({
+          node: options.node,
+          profile: paths.profile,
+          plugins: paths.plugins,
+          home,
+          log: logShell,
+        })
+        logShell(`REA bundle: ${reaState}`)
+        // The science panels import `chemcore` and `rdkit` from the provisioned interpreter.
+        provisionPythonExtras({
+          home,
+          wheelhouse: join(options.resourceDir, 'science', 'wheelhouse'),
+          log: logShell,
+        })
+      }
+      // Python, MinGW, and R are hundreds of megabytes each: starting them here keeps the download
+      // behind the workspace instead of in front of it, and the launch only records the decision.
+      for (const state of provisionRuntimes({ home, log: logShell })) logShell(`runtimes: ${state}`)
+      // Plugins spawn `python` / `python3` / `g++` by bare name, so the provisioned trees have to be
+      // on PATH before the Host spawns. A first launch has nothing on disk yet, hence the poll.
+      const adopt = (): number => {
+        const added = adoptRuntimePath(home)
+        if (added.length > 0) logShell(`runtimes: PATH += ${added.join('; ')}`)
+        return added.length
+      }
+      if (adopt() === 0) {
+        const timer = setInterval(() => {
+          if (adopt() > 0) clearInterval(timer)
+        }, 20_000)
+        setTimeout(() => clearInterval(timer), 30 * 60_000).unref()
+      }
+      // Starting the Host is the one step with no denominator: dsh reports that it is ready, and
+      // nothing in between counts anything, so this shows how long it has been running instead of a
+      // percentage that would have to be invented. Silence is what a stuck launch looks like.
       publishStatus({
-        ...status,
-        note: `正在启动工作区… 已等待 ${String(Math.round((Date.now() - hostStartedAt) / 1000))} 秒`,
+        phase: 'starting',
+        progress: 0.95,
+        version: options.version,
+        step: '启动工作区',
+        note: '正在启动工作区…',
       })
-    }, 1000)
-    try {
-      host = await startHost(paths.profile)
-    } finally {
-      clearInterval(hostTicker)
-    }
-    publishStatus({ phase: 'ready', progress: 1, version: options.version })
+      const hostStartedAt = Date.now()
+      const hostTicker = setInterval(() => {
+        publishStatus({
+          ...status,
+          note: `正在启动工作区… 已等待 ${String(Math.round((Date.now() - hostStartedAt) / 1000))} 秒`,
+        })
+      }, 1000)
+      try {
+        host = await startHost(paths.profile)
+      } finally {
+        clearInterval(hostTicker)
+      }
+      publishStatus({ phase: 'ready', progress: 1, version: options.version })
 
-    // A missing key no longer gates the first window. The workspace signs in to the DeepSeek
-    // account (Settings → Account, or the model step's sign-in dialog) and that sign-in provisions
-    // the key, so the shell reports the credential state in the log and opens straight into the
-    // application instead of stacking a separate 「绑定 DeepSeek 密钥」 window over it.
-    try {
-      const keyStatus = await describeApiKey(host)
-      logShell(keyStatus.configured
-        ? `DeepSeek API key is configured${keyStatus.source === undefined ? '' : ` from ${keyStatus.source}`}`
-        : 'DeepSeek API key is not configured; sign-in is offered inside the workspace')
-    } catch (error) {
+      // A missing key no longer gates the first window. The workspace signs in to the DeepSeek
+      // account (Settings → Account, or the model step's sign-in dialog) and that sign-in provisions
+      // the key, so the shell reports the credential state in the log and opens straight into the
+      // application instead of stacking a separate 「绑定 DeepSeek 密钥」 window over it.
+      try {
+        const keyStatus = await describeApiKey(host)
+        logShell(keyStatus.configured
+          ? `DeepSeek API key is configured${keyStatus.source === undefined ? '' : ` from ${keyStatus.source}`}`
+          : 'DeepSeek API key is not configured; sign-in is offered inside the workspace')
+      } catch (error) {
       // A credential service this shell cannot reach must not decide whether the application
       // opens: the user keeps a working shell and can bind the key from the menu.
-      logShell(`credential check failed; skipping the binding gate: ${errorOf(error, 'credential check failed').message}`)
-    }
-    handshake({ type: 'ready', port: running.port, shellPort: running.shellPort, needsApiKey: false })
-    setTimeout(provisionAfterReady, 0)
+        logShell(`credential check failed; skipping the binding gate: ${errorOf(error, 'credential check failed').message}`)
+      }
+      handshake({ type: 'ready', port: running.port, shellPort: running.shellPort, needsApiKey: false })
+      setTimeout(provisionAfterReady, 0)
     }
 
     /**
@@ -1057,10 +1093,16 @@ if (argv.includes(PREBUILD_SWITCH)) {
   // The installer runs this once its files are in place. A failure is reported on stderr, which
   // the installer writes to its own log, and sets the exit code so a manual run can tell success
   // from failure; the installer ignores both and falls back to the first launch's own build.
-  await prebuild(argv).catch((error: unknown) => {
+  const watchdog = setTimeout(() => {
+    process.stderr.write(`dsh shell: prebuild timed out after ${String(PREBUILD_TIMEOUT_MS / 60000)} minutes\n`)
+    process.exit(1)
+  }, PREBUILD_TIMEOUT_MS)
+  watchdog.unref()
+  await prebuild(withSeedVersion(argv)).catch((error: unknown) => {
     process.stderr.write(`dsh shell: prebuild failed: ${errorOf(error, 'prebuild failed').message}\n`)
     process.exitCode = 1
   })
+  clearTimeout(watchdog)
 } else {
   await main()
 }
