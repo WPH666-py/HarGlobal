@@ -136,20 +136,6 @@ const ALL_PLUGINS: readonly BundledPlugin[] = [
     active: false,
   },
   {
-    // Prompt-injection, jailbreak, and secret-leak defense: it intercepts inbound messages, tool
-    // arguments, and tool results on the official seams and answers allow/ask/block, plus a
-    // destructive-delete guard on shell commands. Its declared peer corridor already covers this
-    // line (`>=0.1.5-alpha.1 <0.2.0`), and it was verified mounted here before being bundled.
-    //
-    // One documented degradation on this line: the audit event's `ignorable` marker is dropped by
-    // hosts that predate it, so the plugin disables session-log audit and warns once instead of
-    // writing events that would make a session unresumable. Detection and interception are
-    // unaffected — only the audit trail is.
-    name: 'dsh-defend',
-    version: '0.3.21',
-    active: true,
-  },
-  {
     // Shadow-git checkpoints of the workspace with one-click rollback, so an agent's multi-file
     // refactor can be undone without touching the user's own commits or branches.
     //
@@ -357,6 +343,9 @@ const ALL_PLUGINS: readonly BundledPlugin[] = [
   // carries a usable version, so it travels as a local archive beside the other ones.
   // Cursor model catalogue and delegate route: bundled so a fresh profile lists the Cursor
   // models without a separate install. It reads the local Cursor login at runtime.
+  // Bundled mihomo core: the app carries its own proxy engine so a machine without a separate
+  // Clash installation still has one, with `external-controller` on by default.
+  { name: 'dsh-clashvpn', version: '0.1.0', spec: 'file:plugins/dsh-clashvpn-0.1.0.tgz', active: true },
   { name: 'dsh-cursor', version: '0.6.4', spec: 'file:plugins/dsh-cursor-0.6.4.tgz', active: true },
   { name: 'dsh-purge', version: '1.1.72', spec: 'file:plugins/dsh-purge-1.1.72.tgz', active: true },
   // Agent-Mix: twelve coding-agent workflows as selectable presets, built in rather than installed
