@@ -178,7 +178,7 @@ function hostAllowed(message: IncomingMessage, ports: readonly number[]): boolea
   if (host === undefined) return false
   for (const port of ports) {
     if (host === `127.0.0.1:${String(port)}` || host === `localhost:${String(port)}`) return true
-    if (lanAddresses().some((address) => host === `${address}:${String(port)}`)) return true
+    if (lanAddresses().some(address => host === `${address}:${String(port)}`)) return true
   }
   return false
 }
@@ -283,18 +283,18 @@ function lanCookie(message: IncomingMessage): string | undefined {
  */
 function sendLanNotice(response: ServerResponse, reason: 'off' | 'locked'): void {
   const body = Buffer.from(
-    `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">`
-    + `<meta name="viewport" content="width=device-width,initial-scale=1">`
+    '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">'
+    + '<meta name="viewport" content="width=device-width,initial-scale=1">'
     + `<meta name="dsh-lan-door" content="${reason}">`
-    + `<title>HarGlobal 移动访问</title><style>`    + `body{margin:0;padding:32px 20px;font:16px/1.7 system-ui,"Microsoft YaHei",sans-serif;color:#1f2328;background:#f6f7f9}`
-    + `main{max-width:520px;margin:0 auto;background:#fff;border-radius:16px;padding:28px 24px;box-shadow:0 2px 16px rgba(0,0,0,.06)}`
-    + `h1{font-size:20px;margin:0 0 12px}p{margin:0 0 12px;color:#4b5563}code{background:#f3f4f6;border-radius:6px;padding:2px 6px}`
+    + '<title>HarGlobal 移动访问</title><style>'    + 'body{margin:0;padding:32px 20px;font:16px/1.7 system-ui,"Microsoft YaHei",sans-serif;color:#1f2328;background:#f6f7f9}'
+    + 'main{max-width:520px;margin:0 auto;background:#fff;border-radius:16px;padding:28px 24px;box-shadow:0 2px 16px rgba(0,0,0,.06)}'
+    + 'h1{font-size:20px;margin:0 0 12px}p{margin:0 0 12px;color:#4b5563}code{background:#f3f4f6;border-radius:6px;padding:2px 6px}'
     + `</style></head><body><main><h1>${reason === 'off' ? '局域网访问未开启' : '这台手机还没有配对'}</h1>`
     + (reason === 'off'
-      ? `<p>电脑端的 HarGlobal 目前只允许本机访问。请在电脑上打开「移动访问」窗口，开启局域网访问，再用窗口里给出的链接或二维码连接。</p>`
-      : `<p>请在电脑上打开「移动访问」窗口，用手机扫描二维码，或把窗口里的链接发到这台手机打开。</p>`)
-    + `<p>链接只在这台电脑上生成，不需要安装证书，也不需要输入配对码。</p>`
-    + `</main></body></html>`,
+      ? '<p>电脑端的 HarGlobal 目前只允许本机访问。请在电脑上打开「移动访问」窗口，开启局域网访问，再用窗口里给出的链接或二维码连接。</p>'
+      : '<p>请在电脑上打开「移动访问」窗口，用手机扫描二维码，或把窗口里的链接发到这台手机打开。</p>')
+    + '<p>链接只在这台电脑上生成，不需要安装证书，也不需要输入配对码。</p>'
+    + '</main></body></html>',
     'utf8',
   )
   response.writeHead(200, {
@@ -363,7 +363,7 @@ let apiCookie: string | undefined
 async function mintApiCookie(port: number, token: string): Promise<string | undefined> {
   try {
     const response = await fetch(`http://127.0.0.1:${String(port)}/connect?token=${encodeURIComponent(token)}&interactions=none`, { redirect: 'manual' })
-    const cookies = response.headers.getSetCookie().map((one) => one.split(';')[0] ?? '').filter((one) => one !== '')
+    const cookies = response.headers.getSetCookie().map(one => one.split(';')[0] ?? '').filter(one => one !== '')
     if (cookies.length === 0) return undefined
     // The cookie is scoped to the Host's own authority, which is the authority this proxy dials, so
     // it is spent here rather than handed to the browser: one jar for every forwarded request.
@@ -623,7 +623,7 @@ async function reapOrphanSidecar(installDir: string | undefined, note: ((line: s
   // The socket is released asynchronously by the OS; give the process a moment to disappear.
   for (let attempt = 0; attempt < 20; attempt += 1) {
     if (!isNodeProcess(recorded)) return true
-    await new Promise((settle) => setTimeout(settle, 100))
+    await new Promise(settle => setTimeout(settle, 100))
   }
   return false
 }
@@ -779,6 +779,24 @@ export async function startShellServer(options: ShellServerOptions): Promise<She
     if (route === 'lan/enable' && method === 'POST') return sendJson(response, 200, options.lan.enable(port))
     if (route === 'lan/disable' && method === 'POST') return sendJson(response, 200, options.lan.disable(port))
     if (route === 'lan/rotate' && method === 'POST') return sendJson(response, 200, options.lan.rotate(port))
+    if (route === 'lan/pair/start' && method === 'POST') {
+      if (!options.lan.enabled) return sendJson(response, 409, { error: 'dsh shell: LAN access is off' })
+      return sendJson(response, 200, options.lan.startPairing())
+    }
+    if (route === 'lan/pair/complete' && method === 'POST') {
+      const body = await readJsonBody(message)
+      const code = requireString(body.code, 'code')
+      const name = typeof body.name === 'string' ? body.name : ''
+      const paired = options.lan.completePairing(code, name)
+      if ('error' in paired) return sendJson(response, 400, paired)
+      return sendJson(response, 200, paired)
+    }
+    if (route === 'lan/devices' && method === 'GET') return sendJson(response, 200, { devices: options.lan.pairedDevices() })
+    if (route === 'lan/devices/revoke' && method === 'POST') {
+      const body = await readJsonBody(message)
+      const id = requireString(body.id, 'id')
+      return sendJson(response, 200, { revoked: options.lan.revokeDevice(id) })
+    }
     return sendJson(response, 404, { error: 'dsh shell: unknown control route' })
   }
 
@@ -827,6 +845,16 @@ export async function startShellServer(options: ShellServerOptions): Promise<She
       }
       if (remote) {
         if (url.pathname === LAN_UNLOCK_PATH) {
+          const device = url.searchParams.get('device')
+          if (device !== null && options.lan.verifyDevice(device)) {
+            response.writeHead(302, {
+              'set-cookie': options.lan.cookieHeader(device),
+              location: '/',
+              'cache-control': 'no-store',
+            })
+            response.end()
+            return
+          }
           if (!options.lan.verifyKey(url.searchParams.get('key'))) {
             sendLanNotice(response, lanOpen ? 'locked' : 'off')
             return
@@ -843,7 +871,8 @@ export async function startShellServer(options: ShellServerOptions): Promise<She
           sendLanNotice(response, 'off')
           return
         }
-        if (!options.lan.verify(lanCookie(message))) {
+        const presented = lanCookie(message)
+        if (!options.lan.verify(presented) && !options.lan.verifyDevice(presented)) {
           sendLanNotice(response, 'locked')
           return
         }

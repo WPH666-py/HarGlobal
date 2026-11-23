@@ -22,3 +22,12 @@ section { margin-top: 18px; }
 button { padding: 9px 14px; font: inherit; color: #1f2328; background: #fff; border: 1px solid #d8dee4; border-radius: 8px; cursor: pointer; }
 button:hover { background: #f3f4f6; }
 .foot { margin-top: 18px; color: #57606a; }
+.code { font-size: 32px; letter-spacing: 8px; font-family: monospace; text-align: center; margin: 12px 0 4px; }
+
+.devices { list-style: none; padding: 0; margin: 8px 0 16px; }
+
+.devices li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid rgba(128,128,128,0.2); }
+
+.devices .empty { color: #888; }
+
+.diag { font-size: 13px; line-height: 1.7; color: #666; }
