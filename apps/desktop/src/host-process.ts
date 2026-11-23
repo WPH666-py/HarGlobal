@@ -154,7 +154,10 @@ export class DesktopHostProcess {
       env: {
         ...Object.fromEntries(Object.entries(process.env).filter(([name]) => (
           name !== 'NODE_OPTIONS' && name !== 'NODE_COMPILE_CACHE'
-          && !/^DSH_DESKTOP_/u.test(name) && !/^(?:npm|pnpm|corepack)_/iu.test(name)
+          // Every other DSH_DESKTOP_* name is this shell's own. The deferred-bundle list is the
+          // one the host reads, and dropping it made the opt-in list never arrive.
+          && !(name.startsWith('DSH_DESKTOP_') && name !== 'DSH_DESKTOP_DEFERRED')
+          && !/^(?:npm|pnpm|corepack)_/iu.test(name)
         ))),
         // The WorkBuddy AI card reads the account file its desktop app writes, and it refuses to do
         // so until it knows where that app lives. See {@link resolveWorkbuddyAiBinary} for why the

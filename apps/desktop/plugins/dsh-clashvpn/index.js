@@ -373,5 +373,7 @@ export function apply(ctx, rawConfig) {
   }
 
   registerRoutes()
+  // Starting the core fetches a subscription and spawns mihomo. The handshake does not wait for
+  // either; a failure stays on the status route.
   if (config.autostart) void start()
 }

@@ -101,10 +101,21 @@ export interface DesktopHostController {
  * defer a plugin this build does not know about.
  */
 const DEFERRED_BUNDLES: readonly string[] = [
-  // Empty by default. Mounting a loader entry after `ready` extends the client module graph while
-  // the page's connection generation is already negotiating, and that generation then never becomes
-  // ready: the window reconnects forever instead of showing sessions. Until the client can be told to
-  // re-bootstrap against an extended graph, deferral stays opt-in per machine.
+  // These packages declare no `dsh.client`, so mounting them after the handshake does not extend
+  // the page's module graph. Their `apply()` may start a core, a catalog fetch, or a local
+  // process; none of that is on the path that paints the conversation. Packages that contribute
+  // a client entry stay in the first composition — adding one after `ready` leaves the page
+  // reconnecting. `@deepseek-ai/dsh-base` and `@deepseek-ai/dsh-web-app` stay too: they are the
+  // composition the window is.
+  '@vectorize-io/hindsight-coding-agents',
+  'dsh-ultramath',
+  'dsh-mech-workbench',
+  'dsh-math-olympiad',
+  'dsh-video-to-notes',
+  'dsh-blender',
+  'dsh-clashvpn',
+  'dsh-cursor',
+  'agent-mix',
   ...(process.env.DSH_DESKTOP_DEFERRED ?? '').split(',').map(name => name.trim()).filter(name => name !== ''),
 ]
 
@@ -548,8 +559,8 @@ export async function runDesktopHost(
           { redirect: 'manual' },
         )
         const cookies = response.headers.getSetCookie()
-          .map((one) => one.split(';')[0] ?? '')
-          .filter((one) => one !== '')
+          .map(one => one.split(';')[0] ?? '')
+          .filter(one => one !== '')
         return cookies.length === 0 ? undefined : cookies.join('; ')
       } catch {
         return undefined

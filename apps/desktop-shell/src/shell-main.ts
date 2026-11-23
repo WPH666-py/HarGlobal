@@ -532,7 +532,9 @@ async function main(): Promise<void> {
     }
     // Registered before the handshake, because the Host announces this within seconds of it: a
     // listener attached afterwards would miss the launch it describes.
-    deferredPluginsReady = false
+    // The deferred set is host-only: it adds no client panel, so the page must not reload
+    // when those plugins finish. Leaving this true keeps the deferred watcher off.
+    deferredPluginsReady = true
     next.onDeferredReady = () => {
       deferredPluginsReady = true
       logShell('deferred plugins mounted; the window may reload to pick their panels up')
@@ -751,7 +753,9 @@ async function main(): Promise<void> {
     launchToken: () => launchToken,
   })
   logShell(`${PRODUCT_NAME} ${options.version} starting; workspace on ${running.origin}, shell windows on ${running.shellOrigin}`)
-  handshake({ type: 'listen', port: running.port, shellPort: running.shellPort })
+  // The splash opens on `listen`. The host's first load of the plugin tree is the cold compile,
+  // so that handshake waits until the host has reported ready and the compile is already in the
+  // on-disk cache. The window the user sees is the one after that work.
 
   /** Guards {@link restartInPlace} against a second request while one is running. */
   let restarting = false
@@ -987,6 +991,7 @@ async function main(): Promise<void> {
       // opens: the user keeps a working shell and can bind the key from the menu.
         logShell(`credential check failed; skipping the binding gate: ${errorOf(error, 'credential check failed').message}`)
       }
+      handshake({ type: 'listen', port: running.port, shellPort: running.shellPort })
       handshake({ type: 'ready', port: running.port, shellPort: running.shellPort, needsApiKey: false })
       setTimeout(provisionAfterReady, 0)
     }
@@ -1013,6 +1018,7 @@ async function main(): Promise<void> {
       logShell(`mono bridge ready at ${origin}`)
       publishStatus({ phase: 'ready', progress: 1, version: options.version })
       // The monolith owns its own credential story, so this launch never asks for a key.
+      handshake({ type: 'listen', port: running.port, shellPort: running.shellPort })
       handshake({ type: 'ready', port: running.port, shellPort: running.shellPort, needsApiKey: false })
     }
 
