@@ -1,6 +1,6 @@
 [package]
 name = "harglobal"
-version = "0.2.1-rc.45"
+version = "0.2.1-rc.46"
 edition = "2021"
 description = "HarGlobal desktop shell"
 authors = ["水哥"]
