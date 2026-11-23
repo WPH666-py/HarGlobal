@@ -1,0 +1,25 @@
+{
+  "name": "dsh-clashvpn",
+  "version": "0.1.0",
+  "description": "Bundled mihomo core for HarGlobal: starts the proxy engine and exposes its controller",
+  "type": "module",
+  "main": "index.js",
+  "license": "MIT",
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "*"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "lib",
+    "cordis.patch.yml"
+  ]
+}

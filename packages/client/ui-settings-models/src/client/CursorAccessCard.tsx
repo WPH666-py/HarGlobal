@@ -1,4 +1,4 @@
-/** Cursor readiness card: what the bundled Cursor plugin needs before it can answer a turn. */
+/** Cursor readiness, drawn as one provider row. The probe stays behind Edit. */
 import { useEffect, useState } from 'react'
 import css from './CursorAccessCard.module.css'
 
@@ -46,16 +46,17 @@ async function loadStatus(signal: AbortSignal): Promise<CursorStatus | null> {
 }
 
 /** Copy this card reads from the models dictionary. */
-type CopyKey = (key: 'cursor.title' | 'cursor.ready' | 'cursor.notReady' | 'cursor.copy' | 'cursor.copied' | 'cursor.egress' | 'cursor.egressUnknown' | 'cursor.egressDenied') => string
+type CopyKey = (key: 'cursor.title' | 'cursor.ready' | 'cursor.notReady' | 'cursor.copy' | 'cursor.copied' | 'cursor.egress' | 'cursor.egressUnknown' | 'cursor.egressDenied' | 'edit') => string
 
 /**
- * Draw the Cursor readiness of this machine, with the fix command for each unmet step.
+ * Draw Cursor as one provider row. Edit opens the readiness probe.
  * @param props - localized copy.
- * @returns the card, or null when the status route is absent.
+ * @returns the row, or null when the status route is absent.
  */
 export function CursorAccessCard({ t }: { t: CopyKey }) {
   const [status, setStatus] = useState<CursorStatus | null>(null)
   const [loaded, setLoaded] = useState(false)
+  const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
   useEffect(() => {
     const controller = new AbortController()
@@ -76,30 +77,42 @@ export function CursorAccessCard({ t }: { t: CopyKey }) {
   return (
     <div className={css.card} data-cursor-access>
       <div className={css.head}>
-        <span>{t('cursor.title')}</span>
+        <span className={css.name}>{t('cursor.title')}</span>
         <span className={status.ok ? `${css.badge} ${css.badgeOk}` : `${css.badge} ${css.badgeWarn}`}>
           {status.ok ? t('cursor.ready') : t('cursor.notReady')}
         </span>
+        <button
+          type="button"
+          className={css.edit}
+          aria-expanded={open}
+          onClick={() => { setOpen(current => !current) }}
+        >
+          {t('edit')}
+        </button>
       </div>
-      <EgressRow egress={status.egress} t={t} />
-      <ul className={css.steps}>
-        {status.steps.map(step => (
-          <li key={step.id} className={css.step} data-cursor-step={step.id} data-cursor-step-ok={step.ok ? '1' : '0'}>
-            <div className={css.stepHead}>
-              <span className={css.name}>{step.id}</span>
-              <span className={css.detail}>{step.detail}</span>
-            </div>
-            {step.ok ? null : (
-              <div className={css.fix}>
-                <code className={css.command}>{step.fix}</code>
-                <button type="button" onClick={() => { copy(step.fix) }}>
-                  {copied === step.fix ? t('cursor.copied') : t('cursor.copy')}
-                </button>
-              </div>
-            )}
-          </li>
-        ))}
-      </ul>
+      {open ? (
+        <>
+          <EgressRow egress={status.egress} t={t} />
+          <ul className={css.steps}>
+            {status.steps.map(step => (
+              <li key={step.id} className={css.step} data-cursor-step={step.id} data-cursor-step-ok={step.ok ? '1' : '0'}>
+                <div className={css.stepHead}>
+                  <span className={css.stepName}>{step.id}</span>
+                  <span className={css.detail}>{step.detail}</span>
+                </div>
+                {step.ok ? null : (
+                  <div className={css.fix}>
+                    <code className={css.command}>{step.fix}</code>
+                    <button type="button" className={css.edit} onClick={() => { copy(step.fix) }}>
+                      {copied === step.fix ? t('cursor.copied') : t('cursor.copy')}
+                    </button>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
     </div>
   )
 }
@@ -123,7 +136,7 @@ function EgressRow({ egress, t }: { egress?: CursorEgress | undefined; t: CopyKe
   const label = egress.ok !== false && egress.denied === true ? t('cursor.egressDenied') : undefined
   return (
     <div className={css.egress} data-cursor-egress={egress.ok === false ? 'unknown' : egress.denied === true ? 'denied' : 'allowed'}>
-      <span className={css.name}>{t('cursor.egress')}</span>
+      <span className={css.stepName}>{t('cursor.egress')}</span>
       <span className={tone}>{label ?? detail}</span>
       {label === undefined ? null : <span className={css.detail}>{detail}</span>}
     </div>

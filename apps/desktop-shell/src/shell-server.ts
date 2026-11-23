@@ -378,10 +378,11 @@ function toHostRequest(message: IncomingMessage, port: number): Request {
   const method = (message.method ?? 'GET').toUpperCase()
   const headers = new Headers()
   for (const [name, value] of Object.entries(message.headers)) {
-    // `host` travels with the request: the Host derives the cookie authority from it, so a request
-    // forwarded without one is unauthenticated even when it carries a valid launch token (`/connect`)
-    // or the API cookie. Nothing downstream trusts it for routing.
-    if (value === undefined || HOP_BY_HOP.has(name)) continue
+    // The phone's Host is the LAN address in the QR. The API cookie was minted against
+    // 127.0.0.1, and the Host rejects a cookie whose authority is a different Host, which is
+    // why a scan opened the page and then every API call failed. Dropping Host lets Fetch set
+    // the loopback authority this proxy actually dials — the same choice the working product makes.
+    if (value === undefined || HOP_BY_HOP.has(name) || name === 'host') continue
     if (Array.isArray(value)) for (const one of value) headers.append(name, one)
     else headers.set(name, value)
   }
@@ -928,6 +929,10 @@ export async function startShellServer(options: ShellServerOptions): Promise<She
             + ` headers=${JSON.stringify(Object.fromEntries(Object.entries(message.headers)
               .filter(([name]) => !['host', 'connection', 'cookie', 'user-agent', 'referer', 'accept'].includes(name))))}`,
           )
+        }
+        if (remote && apiCookie === undefined) {
+          const token = options.launchToken?.()
+          if (token !== undefined) await mintApiCookie(port, token)
         }
         const forwarded = toHostRequest(message, port)
         abort.signal.addEventListener('abort', () => { forwarded.signal.throwIfAborted() }, { once: true })

@@ -43,6 +43,7 @@ import type { SettingsDocumentActionInjected } from './SettingsDocumentAction.ts
 import { SettingsDocumentStore } from './settings-document-store.ts'
 import { HostReleasePrompt, type HostReleasePromptInjected } from './HostReleasePrompt.tsx'
 import { en, zh, type SettingsKey } from './locales.ts'
+import { orderSettingsSections } from './section-order.ts'
 
 export type {
   CloseLabelProps, HeaderContentProps, TriggerContentProps,
@@ -153,7 +154,7 @@ export function apply(ctx: ClientContext): void {
                 order: e.options.order ?? 0,
                 label: resolveSlotLabel(e.options.label) ?? '',
               }))
-              .sort((a, b) => a.order - b.order)
+            rows = orderSettingsSections(rows)
           }
           return rows
         },

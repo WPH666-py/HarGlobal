@@ -1,0 +1,13 @@
+# dsh-clashvpn bundle: one Host row; every value below is optional and repeated in README terms.
+#
+# `external-controller` is on by default in the configuration this plugin writes on first start, so
+# the status route and the settings page talk to the core over HTTP. The core starts with the app:
+# a bundled install has a proxy engine without a separate Clash process.
+- insert:
+    - id: dsh-clashvpn
+      name: dsh-clashvpn
+      config:
+        enabled: true
+        mixedPort: 7898
+        controllerPort: 9098
+        autostart: true
