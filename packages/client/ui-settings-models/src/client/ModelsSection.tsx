@@ -30,6 +30,7 @@ import type { LlmNativeAuth, SettingsNamespaceView } from '@deepseek-ai/dsh-api-
 import type {} from './slot-contract.ts'
 import { CustomProviderCard } from './CustomProviderCard.tsx'
 import { deriveKeyRef, protocolChoices, providerUsable, reasoningLevelChoices } from './store.ts'
+import { ClashVpnCard } from './ClashVpnCard.tsx'
 import { CursorAccessCard } from './CursorAccessCard.tsx'
 import type { ModelsSettingsStore, ProviderRow } from './store.ts'
 import type { ModelsOperations } from './operations.ts'
@@ -755,6 +756,7 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
       </Modal>
       {/* The bundled Cursor plugin reports what its CLI still needs; no route renders nothing. */}
       <CursorAccessCard t={t} />
+      <ClashVpnCard t={t} />
     </div>
   )
 }
