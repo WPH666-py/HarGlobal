@@ -1174,7 +1174,7 @@ dependencies = [
 
 [[package]]
 name = "harglobal"
-version = "0.2.1-rc.46"
+version = "0.2.1-rc.48"
 dependencies = [
  "serde",
  "serde_json",

@@ -759,7 +759,10 @@ export async function startShellServer(options: ShellServerOptions): Promise<She
       setImmediate(() => { options.api.restart() })
       return
     }
-    if (route === 'lan' && method === 'GET') return sendJson(response, 200, options.lan.status(port))
+    if (route === 'lan' && method === 'GET') {
+      const status = options.lan.status(port)
+      return sendJson(response, 200, { ...status, pinned: preferredPort !== 0 && port === preferredPort })
+    }
     if (route === 'lan/qr' && method === 'GET') {
       // The QR is drawn here rather than in the page so the shell pages stay dependency-free: the
       // encoder is a build-time dependency of this process, and the page receives finished SVG.
@@ -972,6 +975,7 @@ export async function startShellServer(options: ShellServerOptions): Promise<She
 
   /** Port a phone's link should keep across launches; 0 keeps the old random behaviour. */
   const preferredLanPort = options.lan.enabled ? Number(process.env.HARGLOBAL_LAN_PORT ?? '16800') : 0
+  const preferredPort = preferredLanPort
   let server: Server
   try {
     server = await bindWorkspace(preferredLanPort)

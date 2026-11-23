@@ -1,7 +1,7 @@
 /**
  * The Conversation-header control that names the frame's arrangement and swaps
- * it for the other: the three-column workstation, or the IDE stage that the
- * seat owns.
+ * it for another: the three-column workstation, or one of the two IDE stages, with
+ * the Conversation pulled in as a drawer or pushed out.
  *
  * It is a menu rather than a cycling button because the two destinations are
  * named, so the control says where a click goes instead of which one comes next.
@@ -28,11 +28,12 @@ export type WorkstationToggleProps =
 const useHiddenWorkstation: UseWorkstation = selector => selector(false)
 
 /** The three arrangements, in the order the menu lists them. */
-const PRESENTATIONS: readonly Presentation[] = ['workstation', 'ide']
+const PRESENTATIONS: readonly Presentation[] = ['workstation', 'ide', 'ide-three']
 
 /** Copy key of each arrangement, named literally so the dictionary stays type-checked. */
-function labelOf(presentation: Presentation): 'present.workstation' | 'present.ide' {
-  return presentation === 'workstation' ? 'present.workstation' : 'present.ide'
+function labelOf(presentation: Presentation): 'present.workstation' | 'present.ide' | 'present.ideThree' {
+  if (presentation === 'workstation') return 'present.workstation'
+  return presentation === 'ide' ? 'present.ide' : 'present.ideThree'
 }
 
 /**
@@ -41,10 +42,12 @@ function labelOf(presentation: Presentation): 'present.workstation' | 'present.i
  * @returns the header control.
  */
 export function WorkstationToggle(props: WorkstationToggleProps): ReactNode {
-  const { t, present, useIde, useServerMode } = props
+  const { t, present, useIde, useDrawer, useServerMode } = props
   const useStage = useIde ?? useHiddenWorkstation
+  const useOpenDrawer = useDrawer ?? useHiddenWorkstation
   const useServer = useServerMode ?? useHiddenWorkstation
   const ide = useStage(state => state)
+  const drawer = useOpenDrawer(state => state)
   const onServer = useServer(state => state)
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
@@ -68,7 +71,7 @@ export function WorkstationToggle(props: WorkstationToggleProps): ReactNode {
   // own page, and naming an arrangement there would promise something that page cannot show.
   if (onServer) return null
 
-  const current: Presentation = ide ? 'ide' : 'workstation'
+  const current: Presentation = ide ? (drawer ? 'ide-three' : 'ide') : 'workstation'
   return (
     <div className={css.root} ref={root} data-presentation-menu-root>
       <button

@@ -23,7 +23,7 @@ export type PresentationStage = 'conversation' | 'workstation' | 'ide'
  * full-screen stage, which the seat owns and the Conversation leaves. They are
  * named after what the user sees rather than after the two flags they set.
  */
-export type Presentation = 'workstation' | 'ide'
+export type Presentation = 'workstation' | 'ide' | 'ide-three'
 
 export type MainPanelId = Branded<'MainPanelId'>
 
@@ -273,12 +273,12 @@ export class LayoutController implements ILayout {
   }
 
   /**
-   * Put the frame into one of the two presentations the header's menu offers.
+   * Put the frame into one of the three presentations the header's menu offers.
    *
-   * The workstation is the layout without the seat; the IDE is the full-screen
-   * stage, which needs the seat on before its flag, because the store refuses the
-   * full-screen stage while the seat is off. The Conversation drawer stays shut:
-   * two arrangements leave no third destination for it to reach.
+   * The workstation is the layout without the seat. Both IDE arrangements are the
+   * full-screen stage, which needs the seat on before its flag, because the store
+   * refuses the full-screen stage while the seat is off; they differ in whether the
+   * Conversation is pulled in as a drawer (`ide-three`) or pushed out (`ide`).
    * @param presentation - the arrangement to show.
    */
   present(presentation: Presentation): void {
@@ -288,7 +288,7 @@ export class LayoutController implements ILayout {
     }
     if (!this.workstation.getSnapshot()) this.panels.setWorkstation?.(true)
     this.panels.setIde?.(true)
-    this.panels.setDrawer?.(false)
+    this.panels.setDrawer?.(presentation === 'ide-three')
   }
 
   /** Save the workstation seat's drag width. */

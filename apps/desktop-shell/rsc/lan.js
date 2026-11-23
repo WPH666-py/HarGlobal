@@ -135,7 +135,9 @@ const originalRender = render
 render = (status) => {
   originalRender(status)
   if (status.enabled) {
-    diag.textContent = `当前监听 ${status.address}:${status.port}（端口每次启动都会变，重新生成链接可拿到最新的）`
+    diag.textContent = status.pinned === true
+      ? `当前监听 ${status.address}:${status.port}（固定端口，链接重启后仍然有效）`
+      : `当前监听 ${status.address}:${status.port}（固定端口被占用，已改用随机端口；重新生成链接即可）`
     call('/devices').then((body) => { renderDevices(body.devices) }).catch(() => {})
   }
 }
