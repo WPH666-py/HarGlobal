@@ -410,6 +410,20 @@ function patchInstalledReaGuideTheme(root: string): Promise<void> {
   })
 }
 
+function patchInstalledGitPanelTabDot(root: string): Promise<void> {
+  // The plugin hides the Git pill by request, then paints a status dot on its own tab instead — its
+  // stylesheet documents the dot as the fallback for exactly that setting. This product wants
+  // neither marker, so the tab status is removed where the seed installs the bundle. See
+  // scripts/patch-git-panel-tab-dot.mjs for why this cannot be configuration.
+  return new Promise((resolvePromise, reject) => {
+    const child = spawn(NODE, [join(APP_ROOT, 'scripts', 'patch-git-panel-tab-dot.mjs'), root], { stdio: 'inherit' })
+    child.once('error', reject)
+    child.once('close', (code, signal) => {
+      if (code === 0) resolvePromise()
+      else reject(new Error(`desktop seed: git panel tab dot patch exited with ${String(code ?? signal)}`))
+    })
+  })
+}
 function patchInstalledWeChatIdentity(root: string): Promise<void> {
   // WeChat's contact name for the bot belongs to Tencent's iLink platform, so the only name this
   // product controls is the one the bridge chats under: the built-in surface prompt the plugin
@@ -708,6 +722,7 @@ async function main(): Promise<void> {
     await patchInstalledCourseAssistantDock(installedModules)
     await patchInstalledCourseAssistantPanel(installedModules)
     await patchInstalledReaGuideTheme(installedModules)
+    await patchInstalledGitPanelTabDot(installedModules)
     await applySeedPluginPatches(SEED_ROOT)
     await seedWelcomeAcknowledgement(SEED_ROOT)
     // A verified plugin whose peer range names an older DSH line is skipped by the compatibility
