@@ -345,7 +345,7 @@ const ALL_PLUGINS: readonly BundledPlugin[] = [
   // models without a separate install. It reads the local Cursor login at runtime.
   // Bundled mihomo core: the app carries its own proxy engine so a machine without a separate
   // Clash installation still has one, with `external-controller` on by default.
-  { name: 'dsh-clashvpn', version: '0.1.2', spec: 'file:plugins/dsh-clashvpn-0.1.2.tgz', active: true },
+  { name: 'dsh-clashvpn', version: '0.1.3', spec: 'file:plugins/dsh-clashvpn-0.1.3.tgz', active: true },
   { name: 'dsh-cursor', version: '0.6.4', spec: 'file:plugins/dsh-cursor-0.6.4.tgz', active: true },
   { name: 'dsh-purge', version: '1.1.72', spec: 'file:plugins/dsh-purge-1.1.72.tgz', active: true },
   // Agent-Mix: twelve coding-agent workflows as selectable presets, built in rather than installed
