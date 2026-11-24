@@ -17,6 +17,7 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'no
 import { join, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 import { spawn } from 'node:child_process'
+import { normalizeBundledGitConfig } from '../../desktop/src/bundled-git.ts'
 import { DesktopHostProcess } from '../../desktop/src/host-process.ts'
 import { DesktopLogBuffer, type DesktopLogSnapshot } from '../../desktop/src/log-buffer.ts'
 import { resolveDesktopLocale, type DesktopMessages } from '../../desktop/src/locale.ts'
@@ -511,6 +512,9 @@ async function main(): Promise<void> {
 
   /** Start the Host from one project directory, sharing this process's run log. */
   const startHost = async (projectDir: string): Promise<DesktopHostProcess> => {
+    // A command that authenticates must not open a helper-selection dialog the window cannot own:
+    // the bundled Git asks which helper to use until its system configuration names one.
+    normalizeBundledGitConfig(projectDir, logShell)
     const next = new DesktopHostProcess(options.node, projectDir, undefined, logs, false, compileCacheDir)
     // A Host that ends on its own leaves every request answering "host is unavailable" — the file
     // tree, the history, the server list, all of it — until a Host runs again. Restart it in place:
