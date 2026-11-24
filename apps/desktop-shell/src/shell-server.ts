@@ -20,6 +20,8 @@ import type { ShellStatus } from './shell-types.ts'
 
 /** Path prefix serving the shell's own HTML, CSS, and video assets. */
 export const SHELL_ASSET_PREFIX = '/shell/'
+/** Host path the mobile-access window embeds: the WeChat sign-in page. */
+const WECHAT_PAGE_PREFIX = '/wechat/'
 
 /**
  * Path prefix of the shell control API.
@@ -811,7 +813,10 @@ export async function startShellServer(options: ShellServerOptions): Promise<She
       // finishes keeps a slot from every other page on the same origin. Counted here, where all
       // three kinds of request (page, control, Host proxy) pass through.
       trackRequest(response, url.pathname)
-      if (shellOnly && !url.pathname.startsWith(SHELL_API_PREFIX) && !url.pathname.startsWith(SHELL_ASSET_PREFIX)) {
+      // The mobile-access window embeds the WeChat sign-in page, which belongs to the Host: a
+      // shell window otherwise answers only for its own assets, and that page would 404 here.
+      const ownPage = url.pathname.startsWith(SHELL_API_PREFIX) || url.pathname.startsWith(SHELL_ASSET_PREFIX)
+      if (shellOnly && !ownPage && !url.pathname.startsWith(WECHAT_PAGE_PREFIX)) {
         sendJson(response, 404, { error: 'dsh shell: this origin serves the shell windows only' })
         return
       }

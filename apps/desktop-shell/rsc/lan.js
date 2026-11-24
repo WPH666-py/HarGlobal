@@ -1,143 +1,39 @@
-const toggle = document.querySelector('#toggle')
-const state = document.querySelector('#state')
-const panel = document.querySelector('#panel')
-const linkInput = document.querySelector('#link')
-const qrImage = document.querySelector('#qr')
-const hint = document.querySelector('#hint')
-const foot = document.querySelector('#foot')
+/**
+ * 移动访问窗口：把微信扫码登录页嵌进来。
+ *
+ * 页面由 shell 提供，`/wechat/qr` 属于 Host，经由同源的 Host 代理转发过去，所以这里用相对路径
+ * 请求它，不受跨域限制。插件没装时 Host 返回 404，这里换成一条可操作的提示，而不是留一张 404。
+ */
+const main = document.querySelector('main')
+const box = document.getElementById('frame-box')
+const missing = document.getElementById('missing')
+const hint = document.getElementById('hint')
 
-const call = async (path, method = 'GET') => {
-  const response = await fetch(`/shell-api/lan${path}`, { method, credentials: 'same-origin' })
-  if (!response.ok) throw new Error(`shell-api ${path}: ${response.status}`)
-  return await response.json()
-}
-
-let render = (status) => {
-  toggle.checked = status.enabled === true
-  state.textContent = status.enabled ? '已开启' : '已关闭'
-  panel.hidden = status.enabled !== true
-  if (status.enabled && status.link) {
-    linkInput.value = status.link
-    qrImage.src = `/shell-api/lan/qr?ts=${Date.now()}`
-    hint.textContent = '用手机扫描上面的二维码，或把链接发到手机'
-    foot.textContent = `局域网地址 ${status.address}:${status.port}（手机与电脑需在同一个 Wi-Fi）`
-  } else {
-    linkInput.value = ''
-    qrImage.removeAttribute('src')
-    foot.textContent = ''
-  }
-}
-
-const fail = (error) => { foot.textContent = `操作失败：${error.message}` }
-
-toggle.addEventListener('change', async () => {
-  toggle.disabled = true
+async function probe() {
   try {
-    render(await call(toggle.checked ? '/enable' : '/disable', 'POST'))
+    const response = await fetch('/wechat/qr', { method: 'GET', cache: 'no-store' })
+    const type = response.headers.get('content-type') ?? ''
+    return response.ok && type.includes('text/html')
   } catch (error) {
-    toggle.checked = !toggle.checked
-    fail(error)
-  } finally {
-    toggle.disabled = false
+    // 代理还没准备好（Host 刚启动）时按未就绪处理，重试会自愈。
+    void error
+    return false
   }
-})
-
-document.querySelector('#copy').addEventListener('click', async () => {
-  try {
-    await navigator.clipboard.writeText(linkInput.value)
-    hint.textContent = '链接已复制'
-  } catch {
-    linkInput.select()
-    hint.textContent = '请按 Ctrl+C 复制选中的链接'
-  }
-})
-
-document.querySelector('#rotate').addEventListener('click', async () => {
-  try {
-    render(await call('/rotate', 'POST'))
-    hint.textContent = '旧链接已失效，这是一条新链接'
-  } catch (error) {
-    fail(error)
-  }
-})
-
-try {
-  render(await call(''))
-} catch (error) {
-  fail(error)
 }
-// Pairing: a six-digit code the phone may type when the camera path is not available.
-const pairButton = document.querySelector('#pair')
-const pairCode = document.querySelector('#pairCode')
-const pairHint = document.querySelector('#pairHint')
-const deviceList = document.querySelector('#devices')
-const diag = document.querySelector('#diag')
-const copyFw = document.querySelector('#copyFw')
 
-const renderDevices = (devices) => {
-  deviceList.textContent = ''
-  if (devices.length === 0) {
-    const empty = document.createElement('li')
-    empty.className = 'empty'
-    empty.textContent = '还没有设备配对。'
-    deviceList.append(empty)
+async function present() {
+  const ready = await probe()
+  if (ready) {
+    box.hidden = false
+    hint.hidden = false
+    main.dataset.state = 'ready'
     return
   }
-  for (const device of devices) {
-    const row = document.createElement('li')
-    const label = document.createElement('span')
-    label.textContent = `${device.name} · ${device.createdAt.slice(0, 10)}`
-    const revoke = document.createElement('button')
-    revoke.type = 'button'
-    revoke.textContent = '撤销'
-    revoke.addEventListener('click', async () => {
-      try {
-        await fetch('/shell-api/lan/devices/revoke', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ id: device.id }),
-        })
-        renderDevices((await call('/devices')).devices)
-      } catch (error) {
-        fail(error)
-      }
-    })
-    row.append(label, revoke)
-    deviceList.append(row)
-  }
+  box.hidden = true
+  hint.hidden = true
+  missing.hidden = false
+  main.dataset.state = 'missing'
+  window.setTimeout(present, 3000)
 }
 
-pairButton?.addEventListener('click', async () => {
-  try {
-    const session = await call('/pair/start', 'POST')
-    pairCode.hidden = false
-    pairCode.textContent = session.code
-    const expires = new Date(session.expiresAt)
-    pairHint.textContent = `5 分钟内有效（到 ${expires.toLocaleTimeString()}）。手机上输入这 6 位码即可配对。`
-  } catch (error) {
-    fail(error)
-  }
-})
-
-copyFw?.addEventListener('click', async () => {
-  const command = 'netsh advfirewall firewall add rule name="HarGlobal LAN" dir=in action=allow protocol=TCP localport=' + (new URL(location.href).port || '32323')
-  try {
-    await navigator.clipboard.writeText(command)
-    diag.textContent = '已复制：用管理员 PowerShell 运行即可放行端口。'
-  } catch {
-    diag.textContent = command
-  }
-})
-
-// Load the device list whenever the door is open.
-const originalRender = render
-render = (status) => {
-  originalRender(status)
-  if (status.enabled) {
-    diag.textContent = status.pinned === true
-      ? `当前监听 ${status.address}:${status.port}（固定端口，链接重启后仍然有效）`
-      : `当前监听 ${status.address}:${status.port}（固定端口被占用，已改用随机端口；重新生成链接即可）`
-    call('/devices').then((body) => { renderDevices(body.devices) }).catch(() => {})
-  }
-}
+void present()

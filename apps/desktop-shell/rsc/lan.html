@@ -7,46 +7,20 @@
   <link rel="stylesheet" href="/shell/lan.css">
 </head>
 <body>
-  <main>
+  <main data-state="loading">
     <h1>移动访问</h1>
-    <p class="intro">开启后，同一个 Wi-Fi 下的手机打开链接或扫码即可使用。链接只在这台电脑上生成，不需要装证书，也不需要输入配对码。</p>
+    <p class="intro">用手机微信扫描下面的二维码并确认，之后直接在微信里和这台电脑上的助手对话。不需要同一 Wi-Fi，也不需要配对码。</p>
 
-    <label class="switch">
-      <input id="toggle" type="checkbox">
-      <span>局域网访问</span>
-      <em id="state">已关闭</em>
-    </label>
+    <div id="frame-box" class="frame-box" hidden>
+      <iframe id="frame" src="/wechat/qr" title="微信扫码登录"></iframe>
+    </div>
 
-    <section id="panel" hidden>
-      <div class="qr"><img id="qr" alt="二维码"></div>
-      <p class="hint" id="hint">用手机扫描上面的二维码</p>
-      <div class="row">
-        <input id="link" readonly>
-        <button id="copy" type="button">复制链接</button>
-      </div>
-      <div class="row">
-        <button id="rotate" type="button">重新生成链接</button>
-        <button id="pair" type="button">生成配对码</button>
-      </div>
-      <p class="code" id="pairCode" hidden></p>
-      <p class="hint" id="pairHint"></p>
-      <h2>已配对的设备</h2>
-      <ul class="devices" id="devices"></ul>
-      <h2>连不上？按顺序检查</h2>
-      <ol class="diag">
-        <li>手机和电脑连同一个 Wi-Fi（不要一个 5G 一个访客网络）。</li>
-        <li>第一次连接时，Windows 会弹防火墙提示，请点「允许访问」。</li>
-        <li>公司或学校的 Wi-Fi 常开启「AP 隔离」，同网段设备互不可见，换手机热点试一次即可判断。</li>
-        <li>电脑上装了 Clash / VMware / Hyper-V 时会有多张网卡，页面显示的地址才是最可能被手机访问到的那个。</li>
-      </ol>
-      <p class="diag" id="diag"></p>
-      <div class="row">
-        <button id="copyFw" type="button">复制放行防火墙命令</button>
-      </div>
-    </section>
+    <p id="missing" class="notice" hidden>
+      微信通道没有加载：请到「设置 → 插件管理」安装 <code>dsh-wechat</code>，装好后重启应用再打开这里。
+    </p>
 
-    <p class="foot" id="foot"></p>
+    <p id="hint" class="hint" hidden>二维码 5 分钟有效，过期会在页内自动刷新；登录成功后这一页会自动显示已连接。</p>
   </main>
-  <script type="module" src="/shell/lan.js"></script>
+  <script src="/shell/lan.js"></script>
 </body>
 </html>
