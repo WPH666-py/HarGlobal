@@ -18,6 +18,7 @@ import { join, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 import { spawn } from 'node:child_process'
 import { normalizeBundledGitConfig } from '../../desktop/src/bundled-git.ts'
+import { hideComposerGitPill } from '../../desktop/src/profile-defaults.ts'
 import { DesktopHostProcess } from '../../desktop/src/host-process.ts'
 import { DesktopLogBuffer, type DesktopLogSnapshot } from '../../desktop/src/log-buffer.ts'
 import { resolveDesktopLocale, type DesktopMessages } from '../../desktop/src/locale.ts'
@@ -515,6 +516,8 @@ async function main(): Promise<void> {
     // A command that authenticates must not open a helper-selection dialog the window cannot own:
     // the bundled Git asks which helper to use until its system configuration names one.
     normalizeBundledGitConfig(projectDir, logShell)
+    // The profile keeps the Git panel; the input box does not repeat its branch on every session.
+    hideComposerGitPill(projectDir, logShell)
     const next = new DesktopHostProcess(options.node, projectDir, undefined, logs, false, compileCacheDir)
     // A Host that ends on its own leaves every request answering "host is unavailable" — the file
     // tree, the history, the server list, all of it — until a Host runs again. Restart it in place:
