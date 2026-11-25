@@ -346,6 +346,10 @@ const ALL_PLUGINS: readonly BundledPlugin[] = [
   // Bundled mihomo core: the app carries its own proxy engine so a machine without a separate
   // Clash installation still has one, with `external-controller` on by default.
   { name: 'dsh-clashvpn', version: '0.1.4', spec: 'file:plugins/dsh-clashvpn-0.1.4.tgz', active: true },
+  // IM channels: the same scan-to-chat surface the mobile-access window opens, plus the
+  // multi-channel bridge (WeChat/Feishu/DingTalk/QQ/Slack/Telegram/…) behind one settings page.
+  { name: 'dsh-wechat', version: '0.10.0', spec: 'file:plugins/dsh-wechat-0.10.0.tgz', active: true },
+  { name: '@xmanrui/dsh-im', version: '5.1.0', spec: 'file:plugins/dsh-im-5.1.0.tgz', active: true },
   { name: 'dsh-cursor', version: '0.6.4', spec: 'file:plugins/dsh-cursor-0.6.4.tgz', active: true },
   { name: 'dsh-purge', version: '1.1.72', spec: 'file:plugins/dsh-purge-1.1.72.tgz', active: true },
   // Agent-Mix: twelve coding-agent workflows as selectable presets, built in rather than installed
