@@ -19,7 +19,19 @@
       微信通道没有加载：请到「设置 → 插件管理」安装 <code>dsh-wechat</code>，装好后重启应用再打开这里。
     </p>
 
-    <p id="hint" class="hint" hidden>二维码 5 分钟有效，过期会在页内自动刷新；登录成功后这一页会自动显示已连接。</p>
+    <section id="controls" class="controls" hidden>
+      <div class="row">
+        <label>工作目录<input id="cwd" placeholder="留空表示不修改" autocomplete="off"></label>
+        <label>卡片超时（毫秒）<input id="timeout" placeholder="留空表示不修改" inputmode="numeric" autocomplete="off"></label>
+      </div>
+      <div class="row actions">
+        <button id="save" type="button">保存配置</button>
+        <button id="relogin" type="button">重新扫码</button>
+        <button id="logout" type="button" class="danger">退出登录</button>
+        <span id="message" class="message" role="status"></span>
+      </div>
+      <p class="hint">完整的渠道设置（提示词、跨会话推送、静默等）在「设置 → WeChat」里；这里只放常用的三项。</p>
+    </section>
   </main>
   <script src="/shell/lan.js"></script>
 </body>
