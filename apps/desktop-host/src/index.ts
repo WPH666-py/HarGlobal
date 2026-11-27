@@ -287,8 +287,17 @@ function packageManifestPath(projectDir: string, packageName: string): string {
 }
 
 function isProjectPath(projectDir: string, target: string): boolean {
-  const root = realpathSync(projectDir)
-  const path = realpathSync(target)
+  let root: string
+  let path: string
+  try {
+    root = realpathSync(projectDir)
+    path = realpathSync(target)
+  } catch (error) {
+    // A bundle directory that no longer exists cannot be inside the profile either: a `link:` whose
+    // source was moved or deleted is reported like any other out-of-profile bundle.
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false
+    throw error
+  }
   return path === root || path.startsWith(root + sep)
 }
 
@@ -317,7 +326,7 @@ function profileBundles(projectDir: string): readonly string[] {
  * @param allowLinkedPackages - whether a bundle may resolve outside the profile.
  * @returns the patches this boot applies, plus one group per deferred bundle.
  */
-function desktopPatches(projectDir: string, allowLinkedPackages: boolean): {
+export function desktopPatches(projectDir: string, allowLinkedPackages: boolean): {
   core: PatchOptions[]
   deferred: DeferredBundle[]
 } {
@@ -330,19 +339,25 @@ function desktopPatches(projectDir: string, allowLinkedPackages: boolean): {
   for (const { packageName, reason } of profile.skippedBundles) {
     console.error(`profile bundle skipped: ${packageName} (${reason})`)
   }
+  // An installed launch runs only bundles the profile owns: a `link:` install points at a directory
+  // this installation cannot verify and another machine does not have. Such a bundle is skipped
+  // rather than fatal, because one unusable plugin must not cost the whole workspace.
+  const bundles = profile.layers.filter((layer) => {
+    if (allowLinkedPackages || isProjectPath(projectDir, layer.packageDir)) return true
+    console.error(
+      `profile bundle skipped: ${layer.packageName} `
+      + `(resolved outside the desktop profile: ${layer.packageDir})`,
+    )
+    return false
+  })
+  const skipped = profile.layers.length - bundles.length + profile.skippedBundles.length
   console.log(
-    `[dsh desktop] profile: ${String(profile.layers.length + profile.skippedBundles.length)} bundles, `
-    + `${String(profile.skippedBundles.length)} skipped`,
+    `[dsh desktop] profile: ${String(bundles.length + skipped)} bundles, ${String(skipped)} skipped`,
   )
-  for (const layer of profile.layers) {
-    if (!allowLinkedPackages && !isProjectPath(projectDir, layer.packageDir)) {
-      throw new Error(`dsh desktop: profile bundle ${JSON.stringify(layer.packageName)} resolved outside the desktop profile`)
-    }
-  }
   const deferredNames = new Set(DEFERRED_BUNDLES)
   const deferred: DeferredBundle[] = []
   const layers: PatchOptions[][] = []
-  for (const layer of profile.layers) {
+  for (const layer of bundles) {
     if (!deferredNames.has(layer.packageName)) {
       layers.push(layer.patches)
       continue
